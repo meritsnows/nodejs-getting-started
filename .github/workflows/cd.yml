@@ -1,0 +1,27 @@
+name: CD
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+
+jobs:
+  deploy:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to EC2 via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            if [ ! -d ~/app ]; then
+              git clone https://github.com/meritsnows/nodejs-getting-started.git ~/app
+            fi
+            cd ~/app
+            git pull origin main
+            npm ci --omit=dev
+            pm2 restart nodeapp || pm2 start npm --name nodeapp -- start
